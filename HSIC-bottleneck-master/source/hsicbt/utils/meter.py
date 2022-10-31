@@ -1,5 +1,4 @@
 
-
 class AverageMeter(object):
     """Basic meter"""
     def __init__(self):
