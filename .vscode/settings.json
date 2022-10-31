@@ -1,5 +1,6 @@
 {
     "python.analysis.extraPaths": [
         "./HSIC-bottleneck-master/source"
-    ]
+    ],
+    "python.analysis.typeCheckingMode": "off"
 }

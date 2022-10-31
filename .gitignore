@@ -2,3 +2,5 @@ HSIC-bottleneck-master.zip
 HSIC-bottleneck-master/assets/samples/fig2a-varied-activation-hsic_xz-mnist.pdf
 *.pdf
 *.gif
+
+HSIC_basic/data/*
