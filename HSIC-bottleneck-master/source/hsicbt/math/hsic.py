@@ -7,8 +7,8 @@ def sigma_estimation(X, Y):
     """
     D = distmat(torch.cat([X,Y]))
     D = D.detach().cpu().numpy()
-    Itri = np.tril_indices(D.shape[0], -1)
-    Tri = D[Itri]
+    Itri = np.tril_indices(D.shape[0], -1) ## select lower triangle of the array
+    Tri = D[Itri] # use indices from above to retreive those values
     med = np.median(Tri)
     if med <= 0:
         med=np.mean(Tri)

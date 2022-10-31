@@ -41,7 +41,6 @@ def hsic_train(cepoch, model, data_loader, config_dict):
         h_target = misc.to_categorical(h_target, num_classes=10).float()
         h_data = data.view(-1, np.prod(data.size()[1:]))
 
-     
         idx_range = []
         it = 0
 
