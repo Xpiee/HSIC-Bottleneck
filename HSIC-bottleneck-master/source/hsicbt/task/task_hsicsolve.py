@@ -1,3 +1,4 @@
+from hsicbt.task.utils import task_assigner
 from . import *
 
 def plot_hsicsolve_result(config_dict):
