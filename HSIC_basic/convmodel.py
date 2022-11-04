@@ -35,7 +35,6 @@ def makeblock_dense(in_dim, out_dim, atype):
     
     return out
 
-
 class ModelConv(nn.Module):
 
     def __init__(self, in_width=784, hidden_width=64, n_layers=5, atype='relu', 

@@ -2,7 +2,7 @@ import torch
 import numpy as np
 from misc import *
 from hsic import *
-from model import *
+from convmodel import *
 torch.cuda.is_available()
 
 import torch.nn.functional as F

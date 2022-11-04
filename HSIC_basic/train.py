@@ -2,7 +2,7 @@ import torch
 import numpy as np
 from misc import *
 from hsic import *
-from model import *
+from convmodel import *
 
 import torch.nn.functional as F
 import torch.nn as nn
@@ -13,8 +13,12 @@ from load_data import *
 
 from tqdm import tqdm
 
+from color import print_emph, print_highlight
+from utils import model_save
+import datetime
 
 
+# Standard trainig used for training the formatted model (Ensemble of unformatted and a linear layer with softmax) for classification. 
 def standard_train(cepoch, model, data_loader, optimizer, config_dict):
 
     batch_acc    = AverageMeter()
@@ -60,8 +64,8 @@ def standard_train(cepoch, model, data_loader, optimizer, config_dict):
     
         batch_acc.update(prec1)   
         batch_loss.update(loss)  
-        batch_hischx.update(hx_l)
-        batch_hischy.update(hy_l)
+        batch_hischx.update(hx_l) # Did not update the values in standard training
+        batch_hischy.update(hy_l) # Did not update the values in standard training
 
         msg = 'Train Epoch: {cepoch} [ {cidx:5d}/{tolidx:5d} ({perc:2d}%)] Loss:{loss:.4f} Acc:{acc:.4f} hsic_xz:{hsic_zx:.4f} hsic_yz:{hsic_zy:.4f}'.format(
                         cepoch = cepoch,  
@@ -85,11 +89,10 @@ def standard_train(cepoch, model, data_loader, optimizer, config_dict):
 
     return batch_log
 
-
+# Training block for training the unformat HISC. The idea is to use the HISC objective function to update the weights of the Hidden Layers one by one in the forward pass itself.
 def hsic_train(cepoch, model, data_loader, config_dict):
 
-    # cross_entropy_loss = torch.nn.CrossEntropyLoss()
-    prec1 = total_loss = hx_l = hy_l = -1
+    prec1 = total_loss = hx_l = hy_l = -1 # intialize loss
 
     batch_acc    = AverageMeter()
     batch_loss   = AverageMeter()
@@ -111,7 +114,7 @@ def hsic_train(cepoch, model, data_loader, config_dict):
 
         data   = data.to(config_dict['device'])
         target = target.to(config_dict['device'])
-        output, hiddens = model(data)
+        output, hiddens = model(data) # hiddens: hidden layers (wgt + bias) from the model
 
         h_target = target.view(-1,1)
         h_target = to_categorical(h_target, num_classes=10).float()
@@ -132,20 +135,21 @@ def hsic_train(cepoch, model, data_loader, config_dict):
         for i in range(len(hiddens)):
             
             output, hiddens = model(data)
-            params, param_names = get_layer_parameters(model=model, idx_range=idx_range[i]) # so we only optimize one layer at a time
-            optimizer = optim.SGD(params, lr = config_dict['learning_rate'], momentum=.9, weight_decay=0.001)
+            params, param_names = get_layer_parameters(model=model, idx_range=idx_range[i]) # get parameters of the selected layer; so we only optimize one layer at a time.
+            optimizer = optim.SGD(params, lr = config_dict['learning_rate'], momentum=.9, weight_decay=0.001) # feed layer parameters to the optimizer.
             optimizer.zero_grad()
             
             if len(hiddens[i].size()) > 2:
                 hiddens[i] = hiddens[i].view(-1, np.prod(hiddens[i].size()[1:]))
 
+            # HSIC objective function from hsic.py
             hx_l, hy_l = hsic_loss_obj(
                     hiddens[i],
                     h_target=h_target.float(),
                     h_data=h_data,
-                    sigma=config_dict['sigma'])
+                    sigma=config_dict['sigma']) # Please refer hisc.py for more info
 
-            loss = (hx_l - config_dict['lambda_y']*hy_l)
+            loss = (hx_l - config_dict['lambda_y']*hy_l) # Equation 6 (using eq. 3 instead of eq. 5 from paper.)
             loss.backward()
             optimizer.step()
 
@@ -175,12 +179,8 @@ def hsic_train(cepoch, model, data_loader, config_dict):
     return batch_log, model
 
 
-from color import print_emph, print_highlight
-from utils import model_save
-import datetime
-
-# 1. train the HSIC model with last hidden demensions != 10 and save the model.T_destination
-## 2. Create ensemble model with hsic model + linear model with softmax and train for 10 epochs
+# 1. train the HSIC model with last hidden demensions != 10 and save the model.T_destination.
+## 2. Create ensemble model with hsic model + linear model with softmax and train for 10 epochs (Format training)
 ## without backprop (only update last layer params by SGD optim.)
 
 def training_hsic(config_dict):
@@ -224,7 +224,7 @@ def training_hsic(config_dict):
 
     return batch_log_list, epoch_log_dict
 
-
+## Format training for formatting the last linear layer for classification. 
 def training_format(config_dict, model_load_path):
 
     print_emph("Format training")
@@ -236,16 +236,19 @@ def training_format(config_dict, model_load_path):
     vanilla_model = ModelVanilla(**config_dict) # Implement this - Done
     torch.manual_seed(config_dict['seed'])
 
+    # unformat model architecture.
     hsic_model = ModelConv(**config_dict)
 
+    # Feeding only the last layer parameters for to the optimizer.
     optimizer = optim.SGD(filter(lambda p: p.requires_grad, vanilla_model.parameters()),
             lr = config_dict['learning_rate'], weight_decay=0.001)
 
-    model = torch.load(model_load_path)
-
+    # load unformat weights
+    model = torch.load(model_load_path) 
     hsic_model.load_state_dict(model)
     hsic_model.eval()
 
+    # Ensemble model: unformat CNN + linear layer with softmax
     ensemble_model = ModelEnsemble(hsic_model, vanilla_model) ## Implement this - Done
 
     batch_log_list = []
@@ -279,9 +282,8 @@ def training_format(config_dict, model_load_path):
         print_highlight("Epoch - [{:04d}]: Training Acc: {:.2f}".format(cepoch, train_acc), 'green')
         print_highlight("Epoch - [{:04d}]: Testing  Acc: {:.2f}".format(cepoch, test_acc), 'green')
 
-
         # save with each indexed
-        main_path = 'X:/Data Files/Huawei/'
+        main_path = 'Huawei/'
         filename = os.path.join(main_path, config_dict['data_code'])
         model_report, model_data = model_save.create_dirs(filename, time_stamp)
 

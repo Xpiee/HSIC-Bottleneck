@@ -1,16 +1,16 @@
 import torch
 import numpy as np
 
+# This is the main implementation of Equation 3 of the paper
 
-
-# Implement Gausian kernel function to calculate K_X and K_y
-# gausian kernel, k(x, y) ~ exp(-(1/2)*||x - y||^2/sigma**2 )
-
+## Implement Gausian kernel function to calculate K_X and K_y
+## gausian kernel, k(x, y) ~ exp(-(1/2)*||x - y||^2/sigma**2 )
 
 def distmat(X):
-    """ distance matrix
-        Euclidean Distance Matrix (EDM)
+    """ Math for calculating distance matrix
+        Implementing Euclidean Distance Matrix (EDM)
         D = abs(a^2 + b^2 - 2a.b_T)
+        Used in generating kernel matrix in kernelmat()
     """
     r = torch.sum(X*X, 1)
     r = r.view([-1, 1])
@@ -29,12 +29,10 @@ def kernelmat(X, sigma):
     H: centering matrix:: I_m - (1/m)*1_m.1_m
     gaussian kernel: k(x, y) ~ exp(-(1/2)*||x - y||^2/sigma**2)
     """
-
     m = int(X.size()[0]) # batch size
     H = torch.eye(m) - (1./m) * torch.ones([m,m])
 
     Dxx = distmat(X)
-
     variance = 2.*sigma*sigma*X.size()[1]            
     Kx = torch.exp(-Dxx / variance).type(torch.FloatTensor)   # Gaussian kernel
     Kxc = torch.mm(Kx, H) # kernel function centered with H
